@@ -11,12 +11,6 @@ void torch_launch_my_add(torch::Tensor &c,
                 n);
 }
 
-PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def("torch_launch_my_add",
-          &torch_launch_my_add,
-          "my_add kernel warpper");
-}
-
 TORCH_LIBRARY(my_add, m) {
     m.def("torch_launch_my_add", torch_launch_my_add);
 }

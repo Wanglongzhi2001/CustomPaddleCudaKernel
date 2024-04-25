@@ -3,14 +3,14 @@
 
 # Usage
 ## build
-'''
+```
 cd pytorch
 mkdir build && cd build
 cmake ..
 make -j$(nproc)
-'''
+```
 ## run benchmark
-'''
+```
 cd ../benchmark
 python benchmark.py
-'''
+```
