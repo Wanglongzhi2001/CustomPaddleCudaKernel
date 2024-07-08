@@ -13,11 +13,12 @@ python benchmark.py
 ```
 
 ## kernel rodamap
-* [ ] elementwise
-* [ ] reduce_sum
-* [ ] transpose
-* [ ] softmax
-* [ ] matrix multiply
-* [ ] attention
+
+- [x] elementwise_add
+- [ ] reduce_sum
+- [ ] transpose
+- [ ] matrix multiply
+- [ ] softmax
+- [ ] attention
 
 

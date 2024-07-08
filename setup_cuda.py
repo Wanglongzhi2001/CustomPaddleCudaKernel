@@ -54,7 +54,8 @@ setup(
     name="my_paddle_ops",
     ext_modules=CUDAExtension(
         sources=[
-            "./kernel/my_elementwise_add_kernel.cu",
+            "./kernel/elementwise_add_kernel.cu",
+            "./kernel/transpose_kernel.cu",
         ],
         extra_compile_args={
             "cxx": ["-O3"],

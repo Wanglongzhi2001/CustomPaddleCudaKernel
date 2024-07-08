@@ -1,8 +1,7 @@
 #include "utils.h"
-#include "stdio.h"
 
 template<typename T, int64_t vec_size>
-__global__ void my_elementwise_add_kernel(T* c,
+__global__ void elementwise_add_kernel(T* c,
                             const T* a,
                             const T* b,
                             int n) {
@@ -35,7 +34,7 @@ void MyElementWiseAdd(const paddle::Tensor& a,
     dim3 grid((n  + 256 - 1) / 256);
     dim3 block(256);
     auto stream = a.stream();
-    my_elementwise_add_kernel<float, 4><<<grid, block, 0, stream>>>(c.data<float>(), a.data<float>(), b.data<float>(), n);
+    elementwise_add_kernel<float, 4><<<grid, block, 0, stream>>>(c.data<float>(), a.data<float>(), b.data<float>(), n);
 }
 
 PD_BUILD_OP(my_elementwise_add)
