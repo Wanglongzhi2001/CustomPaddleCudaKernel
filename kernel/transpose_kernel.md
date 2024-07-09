@@ -1,12 +1,15 @@
 # ncu benchmark 结果
+- 机器 A30 24G 165W
 - M: 256, N: 256
-- v1: 耗时 6.91 us，计算吞吐 3.31%，内存吞吐 20.66%
-- v2: 耗时 8.7 us，计算吞吐 19.64%，内存吞吐 17.92%
-- v3: 耗时 7.49 us，计算吞吐 23.13%，内存吞吐 4.36%
+- v1: 耗时 6.91 us，计算吞吐 3.31%，内存吞吐 20.66%，内存带宽 79.56 Gb/s
+- v2: 耗时 8.7 us，计算吞吐 19.64%，内存吞吐 17.92%，内存带宽 30.07 Gb/s
+- v3: 耗时 7.49 us，计算吞吐 23.13%，内存吞吐 4.36%，内存带宽 35.03 Gb/s
 ncu 命令：
 ```
 ncu --section regex:'^(?!Nvlink)'  --kernel-name transpose_kernel_v2 -o transpose_kernel_v2 -f pytest ./tests/test_kernel.py
 ```
+> NOTE: 
+> 这性能结果很奇怪，待分析是代码问题还是机器问题
 
 # kernel v1
 最暴力的写法，开 M * N 个线程，让线程 (x,y) 负责对 A^T 找到其对应的值 A
