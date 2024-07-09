@@ -12,12 +12,12 @@ python setup_cuda.py install
 pytest ./tests/test_kernel.py
 ```
 
-## kernel rodamap
+## kernel roadmap
 
 - [x] elementwise_add
 - [ ] reduce_sum
 - [ ] transpose
-- [ ] matrix multiply
+- [ ] gemm
 - [ ] softmax
 - [ ] attention
 

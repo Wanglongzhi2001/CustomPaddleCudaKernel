@@ -12,49 +12,97 @@ __global__ void transpose_kernel_v1(const T* __restrict__ x,
     if (tid_x >= M || tid_y >= N) {
         return;
     }
+    // 注意 out 的形状是 [N, M]
     out[tid_y * M + tid_x] = x[tid_x * N + tid_y];
 }
 
 // Add shared memory support
 // 一个 block 处理一块的数据，块大小可能小于 smem 的大小（一个线程处理多个元素）
-// TODO: fix accuracy
+// TODO: fix accuracy when M not equal to N
 template<typename T>
 __global__ void transpose_kernel_v2(const T* __restrict__ x,
                                 T* __restrict__ out,
                                 int M,
                                 int N) {
-    const int smem_x = 32;
-    const int smem_y = 32;
-    __shared__ float smem[smem_x][smem_x];
+    __shared__ float smem[32][32];
 
-    const int ITER_X = smem_x / blockDim.x;
-    const int ITER_Y = smem_y / blockDim.y;
+    const int ITER_X = 32 / blockDim.x;
+    const int ITER_Y = 32 / blockDim.y;
     // load data from global memory to smem 
 #pragma unroll
-    for (int ix = 0; ix < ITER_X; ++ix) {
-        const int global_x = blockDim.x * blockIdx.x + threadIdx.x;
-        const int local_x = ix * blockDim.x + threadIdx.x % blockDim.x;
+    for (int iy = 0; iy < ITER_Y; ++iy) {
+        const int global_y = blockDim.y * blockIdx.y + threadIdx.y;
+        const int local_y = iy * blockDim.y + threadIdx.y % blockDim.y;
 #pragma unroll
-        for (int iy = 0; iy < ITER_Y; ++iy) {
-            const int global_y = blockDim.y * blockIdx.y + threadIdx.y;
-            const int local_y = iy * blockDim.y + threadIdx.y % blockDim.y;
-            if (global_x < M && global_y < N)
-                smem[local_x][local_y] = x[global_x * N + global_y];
+        for (int ix = 0; ix < ITER_X; ++ix) {
+            const int global_x = blockDim.x * blockIdx.x + threadIdx.x;
+            const int local_x = ix * blockDim.x + threadIdx.x % blockDim.x;
+            if (global_x < M && global_y < N) {
+                // smem[local_x][local_y] = x[global_x * N + global_y];
+                smem[local_x][local_y] = x[global_y * N + global_x];
+            }
         }
     }
     __syncthreads();
 
     // store data from smem to output
 #pragma unroll
-    for (int ix = 0; ix < ITER_X; ++ix) {
-        const int global_x = blockDim.x * blockIdx.x + threadIdx.x;
-        const int local_x = ix * blockDim.x + threadIdx.x % blockDim.x;
+    for (int iy = 0; iy < ITER_Y; ++iy) {
+        const int global_y = blockDim.x * blockIdx.x + threadIdx.y;
+        const int local_y = iy * blockDim.y + threadIdx.y % blockDim.y;
 #pragma unroll
-        for (int iy = 0; iy < ITER_Y; ++iy) {
-            const int global_y = blockDim.y * blockIdx.y + threadIdx.y;
-            const int local_y = iy * blockDim.y + threadIdx.y % blockDim.y;
-            if (global_x < M && global_y < N)
-                out[global_x * N + global_y] = smem[local_y][local_x];
+        for (int ix = 0; ix < ITER_X; ++ix) {
+            const int global_x = blockDim.y * blockIdx.y + threadIdx.x;
+            const int local_x = ix * blockDim.x + threadIdx.x % blockDim.x;
+            if (global_x < M && global_y < N) {
+                // out[global_y * M + global_x] = smem[local_x][local_y];
+                out[global_y * M + global_x] = smem[local_y][local_x];
+            }
+        }
+    }
+}
+
+
+// Deal with bank conflict
+template<typename T>
+__global__ void transpose_kernel_v3(const T* __restrict__ x,
+                                T* __restrict__ out,
+                                int M,
+                                int N) {
+    __shared__ float smem[32][33];
+
+    const int ITER_X = 32 / blockDim.x;
+    const int ITER_Y = 32 / blockDim.y;
+    // load data from global memory to smem 
+#pragma unroll
+    for (int iy = 0; iy < ITER_Y; ++iy) {
+        const int global_y = blockDim.y * blockIdx.y + threadIdx.y;
+        const int local_y = iy * blockDim.y + threadIdx.y % blockDim.y;
+#pragma unroll
+        for (int ix = 0; ix < ITER_X; ++ix) {
+            const int global_x = blockDim.x * blockIdx.x + threadIdx.x;
+            const int local_x = ix * blockDim.x + threadIdx.x % blockDim.x;
+            if (global_x < M && global_y < N) {
+                // smem[local_x][local_y] = x[global_x * N + global_y];
+                smem[local_x][local_y] = x[global_y * N + global_x];
+            }
+        }
+    }
+    __syncthreads();
+
+    // store data from smem to output
+#pragma unroll
+    for (int iy = 0; iy < ITER_Y; ++iy) {
+        const int global_y = blockDim.x * blockIdx.x + threadIdx.y;
+        const int local_y = iy * blockDim.y + threadIdx.y % blockDim.y;
+#pragma unroll
+        for (int ix = 0; ix < ITER_X; ++ix) {
+            const int global_x = blockDim.y * blockIdx.y + threadIdx.x;
+            const int local_x = ix * blockDim.x + threadIdx.x % blockDim.x;
+            if (global_x < M && global_y < N) {
+                // out[global_y * M + global_x] = smem[local_x][local_y];
+                out[global_y * M + global_x] = smem[local_y][local_x];
+            }
         }
     }
 }
@@ -70,7 +118,7 @@ void MyTranspose(const paddle::Tensor& x,
     dim3 grid((M  + dimx - 1) / dimx, (N + dimy - 1) / dimy);
     dim3 block(dimx , dimy);
     auto stream = x.stream();
-    transpose_kernel_v1<<<grid, block, 0, stream>>>(x.data<float>(), out.data<float>(), M, N);
+    transpose_kernel_v2<<<grid, block, 0, stream>>>(x.data<float>(), out.data<float>(), M, N);
 }
 
 PD_BUILD_OP(my_transpose)
