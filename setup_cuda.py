@@ -52,6 +52,8 @@ setup(
         sources=[
             "./kernel/elementwise_add_kernel.cu",
             "./kernel/transpose_kernel.cu",
+            "./kernel/gemm_kernel.cu",
+            "./kernel/reduce_kernel.cu"
         ],
         extra_compile_args={
             "cxx": ["-O3"],

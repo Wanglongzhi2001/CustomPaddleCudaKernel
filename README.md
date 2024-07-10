@@ -15,8 +15,8 @@ pytest ./tests/test_kernel.py
 ## kernel roadmap
 
 - [x] elementwise_add
-- [ ] reduce_sum
-- [ ] transpose
+- [x] reduce_sum
+- [x] transpose
 - [ ] gemm
 - [ ] softmax
 - [ ] attention
