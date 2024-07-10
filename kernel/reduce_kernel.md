@@ -72,6 +72,8 @@ _global__ void warpReduce(float* input) {
 
 首先解析下线程块和线程切分：
 ![](../assets/reduce_kernel/img1.png)
+
+
 一个线程块负责一部分数目数组的归约和。而一个线程计算一个输入数组块的 NUM_PER_THREAD 个元素，而这 NUM_PER_THREAD 个元素在输入元素中的间隔为 blockSize（NUM_PER_THREAD等于一个输入数组块元素除线程块数目）。
 
 然后在下面的代码中，一个线程块中的每个线程将它负责的 NUM_PER_THREAD 个元素累加和，这样一个输入数组块中的所有元素的累加和都被 offload 到一个线程块中。一个数组块元素的归约和就转换成一线程块的归约和。
@@ -90,7 +92,10 @@ _global__ void warpReduce(float* input) {
 
 ![](../assets/reduce_kernel/img2.png)
 
+
 然后下面代码将这些粉色元素存放到 shared memory 中
+
+
 ```
     if(laneId == 0 )warpLevelSums[warpId] = sum;
 ```
@@ -98,15 +103,17 @@ _global__ void warpReduce(float* input) {
 由于上图所示的是这些部分归约和分布在间隔 warp 的线程里，不方便我们再次使用 warpReduceSum 进行线程内归约和，所以我们将这些部分归约和元素都放到第一个 warp 中，方便在这个 warp 中使用 warpReduceSum 以得到最终的 block 内所有元素归约和结果。
 
 也就是下面代码块里的将 shared memory 里的元素放到第一个 warp 中
-````
+
+```
 sum = (threadIdx.x < blockDim.x / WARP_SIZE) ? warpLevelSums[laneId] : 0;
 ```
+
 最后在第一个 warp 内进行归约和，结果为这一个输入数组块元素的 blockReduceSum 存放在第一个 thread 上并存放在输出数据指针上。
+
 ```
     // Final reduce using first warp
     if (warpId == 0) sum = warpReduceSum<blockSize/WARP_SIZE>(sum); 
     // write result for this block to global mem
     if (tid == 0) g_odata[blockIdx.x] = sum;
 ```
-
 输出数组长度为 thread block 数目，每个元素存放着对应 block 的归约和！
