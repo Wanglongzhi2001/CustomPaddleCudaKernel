@@ -17,6 +17,7 @@ pytest ./tests/test_kernel.py
 - [x] elementwise_add
 - [x] reduce_sum
 - [x] transpose
+- [x] rms_norm
 - [ ] gemm
 - [x] softmax
 - [ ] attention
