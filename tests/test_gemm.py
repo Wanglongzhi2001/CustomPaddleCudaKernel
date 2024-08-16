@@ -3,6 +3,8 @@ import numpy as np
 import pytest
 from my_paddle_ops import my_gemm
 
+paddle.seed(2024)
+np.random.seed(2024)
 
 @pytest.mark.parametrize('m', [512])
 @pytest.mark.parametrize('n', [512])

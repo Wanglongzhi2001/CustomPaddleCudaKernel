@@ -3,6 +3,8 @@ import numpy as np
 import pytest
 from my_paddle_ops import my_rms_norm
 
+paddle.seed(2024)
+np.random.seed(2024)
 
 @pytest.mark.parametrize('num_tokens', [7, 83, 256])
 @pytest.mark.parametrize('hidden_size', [1768, 1769, 1770, 1771, 5120, 5124, 5125, 5126, 8192])
