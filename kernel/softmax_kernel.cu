@@ -37,7 +37,7 @@ __global__ void softmax_v1(
     if (idx < total_elem_cnt) output[idx] = exp_val / block_sum[blockIdx.x]; 
 }
 
-void launchSoftmaxV1(paddle::Tensor& x, paddle::Tensor& res) {
+void launchSoftmaxV1(paddle::Tensor& x, paddle::Tensor& output) {
     int M = x.dims()[0];
     int N = x.dims()[1];
     int elem_cnt = x.numel();
@@ -47,18 +47,29 @@ void launchSoftmaxV1(paddle::Tensor& x, paddle::Tensor& res) {
     dim3 Block( BLOCK_SIZE, 1);
     auto stream = x.stream();
     float *block_sum;
-    cudaMalloc((void **)&block_sum, M*sizeof(float));
-    softmax_v1<<<Grid, Block>>>(x.data<float>(), res.data<float>(), elem_cnt, block_sum, BLOCK_SIZE);
+    cudaMalloc((void **)&block_sum, M * sizeof(float));
+    softmax_v1<<<Grid, Block>>>(x.data<float>(), output.data<float>(), elem_cnt, block_sum, BLOCK_SIZE);
 }
 
 
-void MySoftmax(paddle::Tensor& x,
-            paddle::Tensor& res) {
-    launchSoftmaxV1(x, res);
+std::vector<paddle::Tensor> MySoftmax(paddle::Tensor& x) {
+    auto output = paddle::full(x.shape(), 0, x.dtype(), x.place());
+    launchSoftmaxV1(x, output);
+    return {output};
 }
+
+std::vector<std::vector<int64_t>> MySoftmaxInferShape(const std::vector<int64_t>& x_shape) {
+    return {x_shape};
+}
+
+std::vector<paddle::DataType> MySoftmaxInferDtype(const paddle::DataType& x_dtype) {
+    return {x_dtype};
+}
+
 
 PD_BUILD_OP(my_softmax)
-    .Inputs({"x", "res"})
-    .Outputs({"Out"})
-    .SetInplaceMap({{"res", "Out"}})
-    .SetKernelFn(PD_KERNEL(MySoftmax));
+    .Inputs({"x"})
+    .Outputs({"out"})
+    .SetKernelFn(PD_KERNEL(MySoftmax))
+    .SetInferShapeFn(PD_INFER_SHAPE(MySoftmaxInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(MySoftmaxInferDtype));

@@ -16,7 +16,6 @@ def test_rms_norm_kernel(num_tokens, hidden_size):
     epsilon = 1e-6
     my_epsilon = paddle.to_tensor([1e-6], dtype=paddle.float32)
     paddle_rmsnorm = paddle.incubate.nn.functional.fused_rms_norm(paddle_x, paddle_weight, paddle_bias, epsilon, 1)[0]
-    my_res = paddle.zeros(x_shape)
-    my_res = my_rms_norm(paddle_x, paddle_weight, my_epsilon, my_res)
+    my_res = my_rms_norm(paddle_x, paddle_weight, my_epsilon)
     np.testing.assert_allclose(my_res.cpu().numpy(), paddle_rmsnorm.cpu().numpy(), rtol=1e-5, atol=1e-5)
     

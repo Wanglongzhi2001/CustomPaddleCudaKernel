@@ -45,7 +45,6 @@ __global__ void rms_norm_kernel(
     __shared__ float s_variance;
 
     const int tid = threadIdx.x;
-    if (tid == 0) printf("you have got 3\n");
     // 平方值，blockReduce 统计
     float variance = 0.0f;
 
@@ -54,14 +53,11 @@ __global__ void rms_norm_kernel(
         const int input_idx = blockIdx.x * hidden_size + i;
         variance += input[input_idx] * input[input_idx];
     }
-
-    if (tid == 0) printf("you have got 4\n");
     // block ReduceSum 
     variance = blockReduceSum<blockSize>(variance);
     if (threadIdx.x == 0) {
         s_variance = rsqrtf(variance / hidden_size + epsilon[0]);
     }
-    if (tid == 0) printf("you have got 5\n");
 
     __syncthreads();
     for (int i = tid; i < hidden_size; i += blockDim.x) {
@@ -72,7 +68,6 @@ __global__ void rms_norm_kernel(
 }
 
 void launchRMSNorm(paddle::Tensor& input, paddle::Tensor& weight, paddle::Tensor& epsilon, paddle::Tensor& output) {
-    printf("you have got 1\n");
     int hidden_size = input.dims()[1];
     int num_tokens = input.dims()[0];
     const int blockSize = 1024;
@@ -80,22 +75,32 @@ void launchRMSNorm(paddle::Tensor& input, paddle::Tensor& weight, paddle::Tensor
     dim3 block(blockSize);
     auto stream = input.stream();
 
-    printf("you have got 2\n");
     // 一个 block 计算一行数据
     rms_norm_kernel<blockSize><<<grid, block, 0, stream>>>(input.data<float>(), weight.data<float>(), output.data<float>(), epsilon.data<float>(), num_tokens, hidden_size);
 }
 
 
 
-void MyRMSNorm(paddle::Tensor& input,
+std::vector<paddle::Tensor> MyRMSNorm(paddle::Tensor& input,
             paddle::Tensor& weight,
-            paddle::Tensor&  epsilon,
-            paddle::Tensor& output) {
+            paddle::Tensor&  epsilon) {
+    auto output = paddle::full(input.shape(), 0, input.dtype(), input.place());
     launchRMSNorm(input, weight, epsilon, output);
+    return {output};
 }
 
+std::vector<std::vector<int64_t>> MyRMSNormInferShape(const std::vector<int64_t>& x_shape) {
+    return {x_shape};
+}
+
+std::vector<paddle::DataType> MyRMSNormInferDtype(const paddle::DataType& x_dtype) {
+    return {x_dtype};
+}
+
+
 PD_BUILD_OP(my_rms_norm)
-    .Inputs({"input", "weight", "epsilon", "output"})
-    .Outputs({"Out"})
-    .SetInplaceMap({{"output", "Out"}})
-    .SetKernelFn(PD_KERNEL(MyRMSNorm));
+    .Inputs({"input", "weight", "epsilon"})
+    .Outputs({"out"})
+    .SetKernelFn(PD_KERNEL(MyRMSNorm))
+    .SetInferShapeFn(PD_INFER_SHAPE(MyRMSNormInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(MyRMSNormInferDtype));

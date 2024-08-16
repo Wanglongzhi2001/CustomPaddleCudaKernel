@@ -16,7 +16,7 @@ __device__ __forceinline__ float warpReduceSum(float sum) {
 
 
 template <int blockSize>
-__global__ void blockReduceKernel(float *g_idata,float *g_odata, int n, int NUM_PER_THREAD){
+__global__ void blockReduceSum(float *g_idata, float *g_odata, const int NUM_PER_THREAD){
     float sum = 0;
 
     // each thread loads one element from global to shared mem
@@ -35,7 +35,7 @@ __global__ void blockReduceKernel(float *g_idata,float *g_odata, int n, int NUM_
 
     sum = warpReduceSum<blockSize>(sum);
 
-    if(laneId == 0 )warpLevelSums[warpId] = sum;
+    if(laneId == 0) warpLevelSums[warpId] = sum;
     __syncthreads();
     // read from shared memory only if that warp existed
     sum = (threadIdx.x < blockDim.x / WARP_SIZE) ? warpLevelSums[laneId] : 0;
@@ -54,18 +54,37 @@ void launchBlockReduce(paddle::Tensor& x, paddle::Tensor& res) {
     int NUM_PER_THREAD = NUM_PER_BLOCK / BLOCK_SIZE;
     dim3 Grid( block_num, 1);
     dim3 Block( BLOCK_SIZE, 1);
-    blockReduceKernel<BLOCK_SIZE><<<Grid,Block>>>(x.data<float>(), res.data<float>(), N, NUM_PER_THREAD);
+    auto blockSum = paddle::full({block_num}, 0, x.dtype(), x.place());
+    blockReduceSum<BLOCK_SIZE><<<Grid,Block>>>(x.data<float>(), blockSum.data<float>(), NUM_PER_THREAD);
+ 
+    // final blockReduceSum
+    const int FINAL_BLOCK_SIZE = 256;
+    NUM_PER_THREAD = block_num / FINAL_BLOCK_SIZE;
+    blockReduceSum<BLOCK_SIZE><<<1, BLOCK_SIZE>>>(blockSum.data<float>(), res.data<float>(), NUM_PER_THREAD);
 }
 
 
 
-void MySum(paddle::Tensor& x,
-            paddle::Tensor& res) {
+std::vector<paddle::Tensor> MySum(paddle::Tensor& x) {
+    auto res = paddle::full({1}, 0, x.dtype(), x.place());
     launchBlockReduce(x, res);
+    return {res};
 }
+
+
+std::vector<std::vector<int64_t>> MySumInferShape(const std::vector<int64_t>& x_shape) {
+    return {{1}};
+}
+
+std::vector<paddle::DataType> MySumInferDtype(const paddle::DataType& x_dtype) {
+    return {x_dtype};
+}
+
+
 
 PD_BUILD_OP(my_sum)
-    .Inputs({"x", "res"})
+    .Inputs({"x"})
     .Outputs({"Out"})
-    .SetInplaceMap({{"res", "Out"}})
-    .SetKernelFn(PD_KERNEL(MySum));
+    .SetKernelFn(PD_KERNEL(MySum))
+    .SetInferShapeFn(PD_INFER_SHAPE(MySumInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(MySumInferDtype));

@@ -27,18 +27,42 @@ __global__ void elementwise_add_kernel(T* c,
 }
 
 
-void MyElementWiseAdd(const paddle::Tensor& a,
-                    const paddle::Tensor& b,
-                    paddle::Tensor& c) {
+std::vector<paddle::Tensor> MyElementWiseAdd(const paddle::Tensor& a,
+                    const paddle::Tensor& b) {
     int n = a.numel();
-    dim3 grid((n  + 256 - 1) / 256);
+    const int vec_size = 4;
+    dim3 grid((n  + 256 - 1) / (256 * vec_size));
     dim3 block(256);
     auto stream = a.stream();
+    // std::vector<int64_t> c_shape;
+    // for (int i = 0; i < a.dims().size(); ++i) {
+    //     c_shape.push_back(a.dims()[i]);
+    // }
+    // std::vector<int64_t> c_shape = a.shape;
+    auto c = paddle::full(a.shape(), 0, a.dtype(), a.place());
     elementwise_add_kernel<float, 4><<<grid, block, 0, stream>>>(c.data<float>(), a.data<float>(), b.data<float>(), n);
+    return {c};
 }
 
+std::vector<std::vector<int64_t>> MyElementWiseAddInferShape(const std::vector<int64_t>& a_shape,
+                                                             const std::vector<int64_t>& b_shape) {
+    int n = a_shape.size();
+    std::vector<std::vector<int64_t>> res_shape;
+    for (int i = 0; i < n; ++i) {
+        res_shape.push_back({a_shape[i]});
+    }
+    return res_shape;
+}
+
+std::vector<paddle::DataType> MyElementWiseAddInferDtype(const paddle::DataType& a_dtype,
+                                                         const paddle::DataType& b_dtype) {
+    return {a_dtype, b_dtype};
+}
+
+
 PD_BUILD_OP(my_elementwise_add)
-    .Inputs({"a", "b", "c"})
-    .Outputs({"c_out"})
-    .SetInplaceMap({{"c", "c_out"}})
-    .SetKernelFn(PD_KERNEL(MyElementWiseAdd));
+    .Inputs({"a", "b"})
+    .Outputs({"c"})
+    .SetKernelFn(PD_KERNEL(MyElementWiseAdd))
+    .SetInferShapeFn(PD_INFER_SHAPE(MyElementWiseAddInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(MyElementWiseAddInferDtype));

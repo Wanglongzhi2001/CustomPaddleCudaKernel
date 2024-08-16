@@ -134,14 +134,30 @@ void launchSGemmv1(paddle::Tensor& a,
 
 
 
-void MyGemm(paddle::Tensor& a,
-            paddle::Tensor& b,
-            paddle::Tensor& c) {
-    launchNaiveGemm(a, b, c);
+std::vector<paddle::Tensor> MyGemm(paddle::Tensor& a,
+            paddle::Tensor& b) {
+    const int M = a.dims()[0];
+    const int N = b.dims()[1];
+    auto out = paddle::full({M, N}, 0, a.dtype(), a.place());
+    launchNaiveGemm(a, b, out);
+    return {out};
 }
 
+std::vector<std::vector<int64_t>> MyGemmInferShape(const std::vector<int64_t>& a_shape,
+                                                    const std::vector<int64_t>& b_shape) {
+    const int M = a_shape[0];
+    const int N = b_shape[1];
+    return {{M, N}};
+}
+
+std::vector<paddle::DataType> MyGemmInferDtype(const paddle::DataType& a_dtype, const paddle::DataType& b_dtype) {
+    return {a_dtype, b_dtype};
+}
+
+
 PD_BUILD_OP(my_gemm)
-    .Inputs({"a", "b", "c"})
-    .Outputs({"Out"})
-    .SetInplaceMap({{"c", "Out"}})
-    .SetKernelFn(PD_KERNEL(MyGemm));
+    .Inputs({"a", "b"})
+    .Outputs({"out"})
+    .SetKernelFn(PD_KERNEL(MyGemm))
+    .SetInferShapeFn(PD_INFER_SHAPE(MyGemmInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(MyGemmInferDtype));

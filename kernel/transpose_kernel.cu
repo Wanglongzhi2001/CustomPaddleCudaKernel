@@ -108,8 +108,7 @@ __global__ void transpose_kernel_v3(const T* __restrict__ x,
 }
 
 
-void MyTranspose(const paddle::Tensor& x,
-                    paddle::Tensor& out) {
+std::vector<paddle::Tensor> MyTranspose(const paddle::Tensor& x) {
     int M = x.dims()[0];
     int N = x.dims()[1];
     int dimx = 32;
@@ -118,11 +117,22 @@ void MyTranspose(const paddle::Tensor& x,
     dim3 grid((M  + dimx - 1) / dimx, (N + dimy - 1) / dimy);
     dim3 block(dimx , dimy);
     auto stream = x.stream();
+    auto out = paddle::full({N, M}, 0, x.dtype(), x.place());
     transpose_kernel_v2<<<grid, block, 0, stream>>>(x.data<float>(), out.data<float>(), M, N);
+    return {out};
+}
+
+std::vector<std::vector<int64_t>> MyTransposeInferShape(const std::vector<int64_t>& x_shape) {
+    return {{x_shape[1], x_shape[0]}};
+}
+
+std::vector<paddle::DataType> MyTransposeInferDtype(const paddle::DataType& x_dtype) {
+    return {x_dtype};
 }
 
 PD_BUILD_OP(my_transpose)
-    .Inputs({"x", "out"})
-    .Outputs({"Out"})
-    .SetInplaceMap({{"out", "Out"}})
-    .SetKernelFn(PD_KERNEL(MyTranspose));
+    .Inputs({"x"})
+    .Outputs({"out"})
+    .SetKernelFn(PD_KERNEL(MyTranspose))
+    .SetInferShapeFn(PD_INFER_SHAPE(MyTransposeInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(MyTransposeInferDtype));
