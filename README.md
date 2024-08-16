@@ -8,8 +8,15 @@ Please make sure you have installed gpu-version of paddle!
 python setup_cuda.py install
 ```
 ## run test
+### run all tests
 ```
-pytest ./tests/test_kernel.py
+pytest ./tests
+```
+
+### run specific test
+For example, test elementwise_add op:
+```
+pytest ./tests/elementwise_add.py
 ```
 
 ## kernel roadmap
@@ -18,7 +25,7 @@ pytest ./tests/test_kernel.py
 - [x] reduce_sum
 - [x] transpose
 - [x] rms_norm
-- [ ] gemm
+- [x] gemm
 - [x] softmax
 - [ ] attention
 
