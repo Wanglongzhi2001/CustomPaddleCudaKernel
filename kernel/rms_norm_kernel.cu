@@ -1,5 +1,5 @@
 #include "utils.h"
-#include "stdio.h"
+
 template <unsigned int blockSize>
 __device__ __forceinline__ float warpReduceSum(float sum) {
     if (blockSize >= 32)sum += __shfl_down_sync(0xffffffff, sum, 16); // 0-16, 1-17, 2-18, etc.
