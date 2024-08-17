@@ -6,8 +6,8 @@ from my_paddle_ops import my_transpose
 paddle.seed(2024)
 np.random.seed(2024)
 
-@pytest.mark.parametrize('m', [256])
-@pytest.mark.parametrize('n', [512])
+@pytest.mark.parametrize('m', [128, 256, 1024])
+@pytest.mark.parametrize('n', [128, 512, 1024])
 def test_transpose(m, n):
     shape = [m, n]
     a = paddle.rand(shape).cuda()
