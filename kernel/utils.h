@@ -101,3 +101,8 @@ HOSTDEVICE inline void Store(const AlignedVector<T, Size>& vec, T* addr) {
 }
 
 constexpr int VEC_16B = 16;
+
+template <typename T>
+inline __device__ __host__ T div_up(T m, T n) {
+  return (m + n - 1) / n;
+}
