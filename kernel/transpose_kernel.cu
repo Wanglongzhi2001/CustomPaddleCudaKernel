@@ -1,6 +1,5 @@
 #include "utils.h"
 
-
 // 2D matrix transpose
 template<typename T>
 __global__ void transpose_kernel_v1(const T* __restrict__ x,
@@ -16,54 +15,6 @@ __global__ void transpose_kernel_v1(const T* __restrict__ x,
     out[tid_y * M + tid_x] = x[tid_x * N + tid_y];
 }
 
-
-// Add shared memory support
-// 一个 block 处理一块的数据，块大小可能小于 smem 的大小（一个线程处理多个元素）
-// TODO: fix accuracy when M not equal to N
-template<typename T>
-__global__ void transpose_kernel_v2(const T* __restrict__ x,
-                                T* __restrict__ out,
-                                int M,
-                                int N) {
-    __shared__ float smem[32][33];
-
-    const int ITER_X = 32 / blockDim.x;
-    const int ITER_Y = 32 / blockDim.y;
-    // load data from global memory to smem 
-#pragma unroll
-    for (int iy = 0; iy < ITER_Y; ++iy) {
-        const int global_y = blockDim.y * blockIdx.y + threadIdx.y;
-        const int local_y = iy * blockDim.y + threadIdx.y % blockDim.y;
-#pragma unroll
-        for (int ix = 0; ix < ITER_X; ++ix) {
-            const int global_x = blockDim.x * blockIdx.x + threadIdx.x;
-            const int local_x = ix * blockDim.x + threadIdx.x % blockDim.x;
-            if (global_x < M && global_y < N) {
-                // smem[local_x][local_y] = x[global_x * N + global_y];
-                smem[local_x][local_y] = x[global_y * N + global_x];
-            }
-        }
-    }
-    __syncthreads();
-
-    // store data from smem to output
-#pragma unroll
-    for (int iy = 0; iy < ITER_Y; ++iy) {
-        const int global_y = blockDim.x * blockIdx.x + threadIdx.y;
-        const int local_y = iy * blockDim.y + threadIdx.y % blockDim.y;
-#pragma unroll
-        for (int ix = 0; ix < ITER_X; ++ix) {
-            const int global_x = blockDim.y * blockIdx.y + threadIdx.x;
-            const int local_x = ix * blockDim.x + threadIdx.x % blockDim.x;
-            if (global_x < M && global_y < N) {
-                // out[global_y * M + global_x] = smem[local_x][local_y];
-                out[global_y * M + global_x] = smem[local_y][local_x];
-            }
-        }
-    }
-}
-
-
 #define BLOCK_DIM 32
 
 // This kernel is optimized to ensure all global reads and writes are coalesced,
@@ -71,19 +22,20 @@ __global__ void transpose_kernel_v2(const T* __restrict__ x,
 // than the naive kernel below.  Note that the shared memory array is sized to 
 // (BLOCK_DIM+1)*BLOCK_DIM.  This pads each row of the 2D block in shared memory 
 // so that bank conflicts do not occur when threads address the array column-wise.
-__global__ void transpose_v3(float *odata, const float *idata, int width, int height)
+template<typename T>
+__global__ void transpose_v2(T *odata, const T *idata, int M, int N)
 {
-	__shared__ float block[BLOCK_DIM][BLOCK_DIM+1];
+	__shared__ float smem[BLOCK_DIM][BLOCK_DIM+1];
 	
 	// read the matrix tile into shared memory
         // load one element per thread from device memory (idata) and store it
         // in transposed order in block[][]
 	unsigned int xIndex = blockIdx.x * BLOCK_DIM + threadIdx.x;
 	unsigned int yIndex = blockIdx.y * BLOCK_DIM + threadIdx.y;
-	if((xIndex < width) && (yIndex < height))
+	if((xIndex < N) && (yIndex < M))
 	{
-		unsigned int index_in = yIndex * width + xIndex;
-		block[threadIdx.y][threadIdx.x] = idata[index_in];
+		unsigned int index_in = yIndex * N + xIndex;
+		smem[threadIdx.y][threadIdx.x] = idata[index_in];
 	}
 
         // synchronise to ensure all writes to block[][] have completed
@@ -92,11 +44,52 @@ __global__ void transpose_v3(float *odata, const float *idata, int width, int he
 	// write the transposed matrix tile to global memory (odata) in linear order
 	xIndex = blockIdx.y * BLOCK_DIM + threadIdx.x;
 	yIndex = blockIdx.x * BLOCK_DIM + threadIdx.y;
-	if((xIndex < height) && (yIndex < width))
+	if((xIndex < M) && (yIndex < N))
 	{
-		unsigned int index_out = yIndex * height + xIndex;
-		odata[index_out] = block[threadIdx.x][threadIdx.y];
+		unsigned int index_out = yIndex * M + xIndex;
+		odata[index_out] = smem[threadIdx.x][threadIdx.y];
 	}
+}
+
+// 一个 block 处理多个块（一个线程处理多个元素），用 shared memory 存储每一趟的中间结果
+template<typename T, int BLOCK_DIM_X, int BLOCK_DIM_Y>
+__global__ void transpose_v3(T *odata, const T *idata, int M, int N) {
+    const int warpSize = 32;
+    __shared__ float smem[warpSize][warpSize+1];
+
+    constexpr const int ITER_NUM_X = warpSize / BLOCK_DIM_Y;
+    constexpr const int ITER_NUM_Y = warpSize / BLOCK_DIM_X;
+
+    // global memory to shared memory
+#pragma unroll
+    for (int iy = 0; iy < ITER_NUM_Y; iy++) {
+      const int ly = iy * BLOCK_DIM_X + threadIdx.x % BLOCK_DIM_X;
+      const int gy = blockIdx.y * warpSize + ly;
+#pragma unroll
+      for (int ix = 0; ix < ITER_NUM_X; ix++) {
+        const int lx = ix * BLOCK_DIM_Y + threadIdx.y % BLOCK_DIM_Y;
+        const int gx = blockIdx.x * warpSize + lx;
+        if (gy < M && gx < N) {
+          smem[lx][ly] = idata[gy * N + gx];
+        }
+      }
+    }
+    __syncthreads();
+
+#pragma unroll
+    for (int iy = 0; iy < ITER_NUM_Y; iy++) {
+      const int ly = iy * BLOCK_DIM_X + threadIdx.x % BLOCK_DIM_X;;
+      const int gy = blockIdx.x * warpSize + ly;
+#pragma unroll
+      for (int ix = 0; ix < ITER_NUM_X; ix++) {
+        const int lx = ix * BLOCK_DIM_Y + threadIdx.y % BLOCK_DIM_Y;
+        const int gx = blockIdx.y * warpSize + lx;
+        if (gy < N && gx < M) {
+          odata[gy * M + gx] = smem[ly][lx];
+        }
+      }
+    }
+   
 }
 
 std::vector<paddle::Tensor> MyTranspose(const paddle::Tensor& x) {
@@ -104,9 +97,11 @@ std::vector<paddle::Tensor> MyTranspose(const paddle::Tensor& x) {
     int N = x.dims()[1];
     auto out = paddle::full({N, M}, 0, x.dtype(), x.place());
 
-    dim3 block(BLOCK_DIM, BLOCK_DIM);
-    dim3 grid((N + BLOCK_DIM - 1)/ BLOCK_DIM, (M + BLOCK_DIM - 1) / BLOCK_DIM);
-    transpose_v3<<< grid, block >>>(out.data<float>(), x.data<float>(), N, M);
+    // dim3 block(BLOCK_DIM, BLOCK_DIM);
+    // dim3 grid((N + BLOCK_DIM - 1)/ BLOCK_DIM, (M + BLOCK_DIM - 1) / BLOCK_DIM);
+    dim3 block(32, 32);
+    dim3 grid((N + block.x - 1) / block.x, (M + block.y - 1) / block.y);
+    transpose_v3<float, 32, 32><<< grid, block >>>(out.data<float>(), x.data<float>(), M, N);
     return {out};
 }
 
