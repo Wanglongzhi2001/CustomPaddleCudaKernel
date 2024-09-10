@@ -1,0 +1,5 @@
+.vscode/
+build/
+dist/
+my_paddle_ops.egg-info/
+tests/__pycache__/

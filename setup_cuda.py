@@ -55,7 +55,8 @@ setup(
             "./kernel/gemm_kernel.cu",
             "./kernel/reduce_kernel.cu",
             "./kernel/softmax_kernel.cu",
-            "./kernel/rms_norm_kernel.cu"
+            "./kernel/rms_norm_kernel.cu",
+            "./kernel/qkv_split_kernel.cu"
         ],
         extra_compile_args={
             "cxx": ["-O3"],
