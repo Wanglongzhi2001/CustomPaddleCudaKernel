@@ -30,6 +30,6 @@ pytest ./tests/elementwise_add.py
 
 ### 高维
 - [x] qkv_split
-- [ ] attention
+- [x] attention
 
 
