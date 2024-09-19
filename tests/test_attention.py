@@ -23,11 +23,11 @@ def attn_ref(query, key, value, mask=None):
     result = paddle.matmul(softmax_result, value)
     return result
 
-# need to optimize kernel's smem, now the dh cannot larger than 64, unless the needed smem is too large
+# need to optimize kernel's smem, now the dh cannot larger than 1020, unless the needed smem is too large
 @pytest.mark.parametrize('bsz', [1, 4, 8])
 @pytest.mark.parametrize('nh', [2, 4, 8])
 @pytest.mark.parametrize('seq_len', [32, 64, 128])
-@pytest.mark.parametrize('dh', [24, 48, 64])
+@pytest.mark.parametrize('dh', [128, 256, 512, 1020])
 def test_attention(bsz, nh, seq_len, dh):
     query_shape = [bsz, nh, seq_len, dh]
     query = paddle.rand(query_shape).cuda()

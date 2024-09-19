@@ -57,7 +57,7 @@ setup(
             "./kernel/softmax_kernel.cu",
             "./kernel/rms_norm_kernel.cu",
             "./kernel/qkv_split_kernel.cu",
-            "./kernel/multihead_attention.cu"
+            "./kernel/multi_head_attention_kernel.cu",
         ],
         extra_compile_args={
             "cxx": ["-O3"],

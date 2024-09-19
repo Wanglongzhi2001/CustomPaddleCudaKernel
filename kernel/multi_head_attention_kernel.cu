@@ -96,10 +96,10 @@ __global__ void multiHeadAttentionKernel(const T* Q, const T* K, const T* V, con
 }
 
 std::vector<paddle::Tensor> MyAttention(const paddle::Tensor& Q,
-                                                         const paddle::Tensor& K,
-                                                         const paddle::Tensor& V) {
+                                        const paddle::Tensor& K,
+                                        const paddle::Tensor& V) {
     // TODO: determine Bc, Br dynamically
-    const int Bc = 32; const int Br = 32;
+    const int Bc = 4; const int Br = 4;
 
     const int B = Q.dims()[0]; const int nh = Q.dims()[1];
     const int N = Q.dims()[2]; const int d = Q.dims()[3];
