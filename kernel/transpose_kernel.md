@@ -15,7 +15,7 @@ ncu 命令：
 ncu --section regex:'^(?!Nvlink)'  --kernel-name transpose_v2 -o transpose_kernel_v2 -f pytest ./tests/test_kernel.py
 ```
 > NOTE: 
-> 未解决 bank conflict 的 kernel v2 居然比 v1 慢，不知是不是未做预热的原因，其他的数据都正常
+> 未解决 bank conflict 的 kernel v2 比 v1 慢，是数组数目太少的原因，待进行更详细的 profile。
 
 # kernel v1
 最暴力的写法，开 M * N 个线程，让线程 (x,y) 负责对 A^T 找到其对应的值 A
