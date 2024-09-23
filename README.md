@@ -20,16 +20,20 @@ pytest ./tests/elementwise_add.py
 ```
 
 ## kernel roadmap
-### 二维
+### normal
 - [x] elementwise_add
 - [x] reduce_sum
 - [x] transpose
 - [x] rms_norm
 - [x] gemm
 - [x] softmax
+- [] activation ops
 
-### 高维
+### transformer related
 - [x] qkv_split
-- [x] attention
+- [x] attention(prefill stage)
+- [] attention(decode stage)
+- [] sampling(topP, topK)
+
 
 
