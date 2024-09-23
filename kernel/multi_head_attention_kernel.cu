@@ -99,7 +99,7 @@ std::vector<paddle::Tensor> MyAttention(const paddle::Tensor& Q,
                                         const paddle::Tensor& K,
                                         const paddle::Tensor& V) {
     // TODO: determine Bc, Br dynamically
-    const int Bc = 4; const int Br = 4;
+    const int Bc = 16; const int Br = 16;
 
     const int B = Q.dims()[0]; const int nh = Q.dims()[1];
     const int N = Q.dims()[2]; const int d = Q.dims()[3];
@@ -116,7 +116,9 @@ std::vector<paddle::Tensor> MyAttention(const paddle::Tensor& Q,
     const int sram_size = (3 * Bc * d * sizeof(float)) + (Bc * Br * sizeof(float));
     int max_sram_size;
     cudaDeviceGetAttribute(&max_sram_size, cudaDevAttrMaxSharedMemoryPerBlock, 0);
-    printf("Max shared memory: %d, requested shared memory: %d \\n", max_sram_size, sram_size);
+    if (sram_size > max_sram_size) {
+        PD_THROW("SRAM size required (",sram_size, ") exceeds device limit (", max_sram_size,")");
+    }
 
     dim3 grid_dim(B, nh);  // batch_size x num_heads
     dim3 block_dim(Bc);  // Bc threads per block
