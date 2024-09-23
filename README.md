@@ -27,13 +27,13 @@ pytest ./tests/elementwise_add.py
 - [x] rms_norm
 - [x] gemm
 - [x] softmax
-- [] activation ops
+- [ ] activation ops
 
 ### transformer related
 - [x] qkv_split
 - [x] attention(prefill stage)
-- [] attention(decode stage)
-- [] sampling(topP, topK)
+- [ ] attention(decode stage)
+- [ ] sampling(topP, topK)
 
 
 
